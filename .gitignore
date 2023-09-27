@@ -1,0 +1,5 @@
+RefSeq_v219.*
+signatures/
+logs/
+test_dataset_Roux2017/
+.snakemake 
