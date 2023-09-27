@@ -9,7 +9,7 @@ rule sourmash_gather:
         "sourmash"
     shell:
         """
-        sourmash gather \
+        sourmash gather --threshold-bp 0 \
         {input.sig} \
         RefSeq_v219.sig \
         -k {wildcards.k} --scaled {wildcards.scaled} \ 
