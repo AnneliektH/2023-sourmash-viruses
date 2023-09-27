@@ -23,7 +23,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        expand("signatures/{sample}.{k}.dna.zip", zip, sample=SAMPLES, k=config["k_size"])
+        expand("signatures/{sample}.{k}.dna.zip", sample=SAMPLES, k=config["k_size"])
 
 # list_all_inputs = [
 #     expand(
