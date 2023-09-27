@@ -3,13 +3,13 @@ import os
 import pandas as pd
 
 include: "sourmash_sig.smk"
+include: "sourmash_gather.smk"
 
 # set configfile with samplenames
 configfile: "config.yaml"
 
 # Load the metadata file
 metadata = pd.read_csv(config['metadata_file_path'], usecols=['Sample'])
-
 
 # Create a list of run ids
 samples = metadata['Sample'].tolist()
@@ -21,15 +21,12 @@ wildcard_constraints:
     sample='\w+',
 
 
+# rule all:
+#     input:
+#         expand("signatures/{sample}.{k}.{scaled}.dna.zip", sample=SAMPLES, k=config["k_size"], scaled=config["scaled"])
+
 rule all:
     input:
-        expand("signatures/{sample}.{k}.dna.zip", sample=SAMPLES, k=config["k_size"])
+        expand("gather/{k}/{sample}-x-RS219-scaled_{scaled}.gather.csv", 
+        sample=SAMPLES, k=config["k_size"], scaled=config["scaled"])
 
-# list_all_inputs = [
-#     expand(
-#         f"signatures/.{sample}.{{k}}.sig", zip, k=config["k_size"], sample=SAMPLES
-#         )]
-
-# rule all:
-#    input:
-#         list_all_inputs
