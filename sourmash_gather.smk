@@ -9,9 +9,10 @@ rule sourmash_gather:
         "sourmash"
     shell:
         """
-        sourmash gather --threshold-bp 0 \
-        {input.sig} \
-        RefSeq_v219.sig \
-        -k {wildcards.k} --scaled {wildcards.scaled} \
-        -o {output.result_csv}
+        sourmash gather \
+        --threshold-bp 0 {input.sig} \
+        RefSeq_v219_allk.sig \
+        -k {wildcards.k} \
+        --scaled {wildcards.scaled} \
+        -o {output.result_csv} 2> {log}
         """

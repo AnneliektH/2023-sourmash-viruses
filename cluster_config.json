@@ -1,0 +1,37 @@
+# json file
+# cluster.json - configuration file for cluster
+
+{
+    "__default__" :
+    {
+        "account" : "ctbrowngrp",
+        "time" : "1:00:00",
+        "job_name" : "snakemake",
+        "nodes" : 1,
+        "ntasks": 1,
+        "partition" : "bmm",
+        "output": "out/snake_%j.out", 
+        "error": "err/snake_%j.err", 
+        "mem_mb": 2000 
+    },
+    "sourmash_gather" :
+    {
+        "time" : "02:00:00",
+        "partition" : "bmm",
+        "ntasks" : 1, 
+        "job_name" : "gather",
+        "output": "out/gather_%j.out",
+        "error": "err/gather_%j.err", 
+        "mem_mb": 30000
+    }, 
+    "sourmash_sig" :
+    {
+        "time" : "01:00:00",
+        "partition" : "bmm",
+        "ntasks" : 1, 
+        "job_name" : "sig",
+        "output": "out/sig_%j.out",
+        "error": "err/sig_%j.err", 
+    }    
+}
+

@@ -2,6 +2,8 @@ metadata_file_path: "./sample_names.csv"
 
 k_size:
   - 8
+  - 11
+  - 12
   - 15
   - 21
   - 31

@@ -1,6 +1,9 @@
-RefSeq_v219.*
+RefSeq_v219*
 signatures/
 logs/
 test_dataset_Roux2017/
 .snakemake 
 gather/
+err/
+out/
+RefSeq_v219_allk.sig
