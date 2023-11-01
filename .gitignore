@@ -7,3 +7,7 @@ gather/
 err/
 out/
 RefSeq_v219_allk.sig
+refseq_headers.txt
+2023-sourmash-viruses.code*
+notebooks/output.roux2017
+/output.roux2017
