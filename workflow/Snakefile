@@ -1,0 +1,152 @@
+# imports
+import os
+import pandas as pd
+
+# Define samples
+SAMPLES, = glob_wildcards('/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/results/sim_reads/{ident}_R1.fq.gz')
+#VIR_CONTIGS, = glob_wildcards('ictv/reads/10M/vir_contigs/{contig}.fa')
+
+wildcard_constraints:
+    sample='\w+',
+
+rule all:
+    input:
+        expand('../results/signatures/{ident}.dna.s100.sig.gz', ident=SAMPLES),
+        expand('../results/virsorter2/{ident}_rename.fa', ident=SAMPLES),
+        expand('../results/megahit/{ident}.contigs.fa', ident=SAMPLES),
+         
+        # expand('ictv/signatures/dna/{contig}.dna.s100.sig.gz', contig=VIR_CONTIGS),
+        # expand('ictv/signatures/prot/{contig}.translate.s100.sig.gz', contig=VIR_CONTIGS)
+        
+rule sketch_reads:
+    input:
+       fq1='../results/sim_reads/{ident}_R1.fq.gz',
+       fq2='../results/sim_reads/{ident}_R2.fq.gz',
+    output:
+        sig_dna='../results/signatures/{ident}.dna.s100.sig.gz',
+        sig_prot='../results/signatures/{ident}.translate.s100.sig.gz'
+    conda: 
+        "branchwater"
+    threads: 6
+    shell:
+        """
+        module load parallel
+        sourmash sketch dna \
+        {input.fq1} {input.fq2} -p abund,k=21,scaled=100,k=15,scaled=100 \
+        -o {output.sig_dna} --name {wildcards.ident} | parallel -j {threads} && \
+        sourmash sketch translate \
+        {input.fq1} {input.fq2} -p abund,k=7,scaled=100,k=10,scaled=100 \
+        -o {output.sig_prot} --name {wildcards.ident} | parallel -j {threads}
+        """
+
+rule assemble:
+# works
+    input:
+       fq1='../results/sim_reads/{ident}_R1.fq.gz',
+       fq2='../results/sim_reads/{ident}_R2.fq.gz',
+    output:
+        contigs='../results/megahit/{ident}.contigs.fa',
+        check = "../results/check/{ident}.mh.done.txt",
+    conda: 
+        "megahit"
+    params:
+        output_folder = "../results/megahit/",
+        output_temp = "../results/megahit_temp"
+    threads: 6
+    shell:
+        """
+        mkdir -p ../results/megahit_temp/
+   
+        # megahit does not allow force overwrite, so each assembly needs to take place in it's own directory. 
+        megahit -1 {input.fq1} -2 {input.fq2} \
+        -t {threads} --continue --k-min 27 --min-contig-len 1000 -m 0.095 \
+        --out-dir {params.output_temp}/{wildcards.ident} \
+        --out-prefix {wildcards.ident} && \
+        mv {params.output_temp}/{wildcards.ident}/{wildcards.ident}.contigs.fa \
+        {params.output_folder} && touch {output.check}
+        """
+
+# rename found vOTUs
+rule bbmap_rename:
+    input: 
+        check = "../results/check/{ident}.mh.done.txt",
+        contigs = "../results/megahit/{ident}.contigs.fa"
+    output: 
+        contigs = "../results/megahit/{ident}.contigs.rename.fa"
+    conda: 
+        "bbmap"
+    shell:
+        """
+        rename.sh in={input.contigs} \
+        out={output.contigs} prefix={wildcards.ident}_contig_
+        """
+
+rule virsorter2:
+    input:
+        contigs = "../results/megahit/{ident}.contigs.rename.fa" 
+    output:
+        check = "../results/check/{ident}.vs.done.txt"
+    conda: 
+        "virsorter2"
+    threads: 6
+    shell:
+        """
+        virsorter run all -w ../results/virsorter2/{wildcards.ident} \
+        -i {input.contigs} -d /group/jbemersogrp/databases/virsorter/ \
+        --min-length 5000 -j {threads} --min-score 0.5 && touch {output.check}
+        """
+rule bbmap_rename_viral:
+    input: 
+        check = "../results/check/{ident}.vs.done.txt"
+    output: 
+        contigs = "../results/virsorter2/{ident}_rename.fa"
+    conda: 
+        "bbmap"
+    shell:
+        """
+        rename.sh in=../results/virsorter2/{wildcards.ident}/final-viral-combined.fa \
+        out={output.contigs} prefix={wildcards.ident}_viral 
+        """
+rule protein_prediction:
+    input:
+        contigs = "../results/vir_contigs/{contig}.fa" 
+    output:
+        prot = "../results/vir_contigs/{contig}.faa"
+    conda: 
+        "prodigal"
+    threads: 1
+    shell:
+        """
+        prodigal -i {input.contigs} -a {output.prot} -p meta -q
+        """
+
+rule sketch_protein:
+    input:
+       nucl='../results/vir_contigs/{contig}.fa',
+       prot='../results/vir_contigs/{contig}.faa',
+    output:
+        sig_dna='../results/signatures/dna/{contig}.dna.s100.sig.gz',
+        sig_prot='../results/signatures/prot/{contig}.translate.s100.sig.gz'
+    conda: 
+        "branchwater"
+    threads: 1
+    shell:
+        """
+        sourmash sketch dna {input.nucl} -p abund,k=21,scaled=100,k=15,scaled=100 \
+        -o {output.sig_dna} && \
+        sourmash sketch protein {input.prot} -p abund,k=7,scaled=100,k=10,scaled=100 \
+        -o {output.sig_prot}
+        """
+
+rule genomad:
+
+rule get_fq_headers:
+# works
+    input:
+        fq='../results/sim_reads/{ident}_R1.fq.gz',
+    output:
+        txt='../results/sim_reads/{ident}.header.txt'
+    shell: """
+        zcat {input.fq} | grep '^@' > {output.txt}
+    """
+

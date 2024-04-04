@@ -1,9 +1,5 @@
 .conda
 .snakemake
 .venv
-genbank
-genomad_200bp
-ictv/reads/10M/*.fq.gz
-ictv/reads/35M/*.fq.gz
-ictv/
-synthetic_data/
+resources/
+results/
