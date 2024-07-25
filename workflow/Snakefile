@@ -1,41 +1,141 @@
-# imports
 import os
 import pandas as pd
 
 # Define samples
-SAMPLES, = glob_wildcards('/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/resources/roux2017/sim_reads/{ident}_QC_R1.fastq.gz')
-FULLGATHER, = glob_wildcards('/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/results/gather/{fullgather}.fullgather.csv')
+#SAMPLES, = glob_wildcards('/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/resources/refseq_vir/{ident}.fasta')
 
-# define dbs
-VIR_DATABASE_DNA_100 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.dna-sc100.zip',
-VIR_DATABASE_DNA_1000 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.dna-sc1000.zip',
-VIR_DATABASE_DNA_10 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.dna-sc10.zip',
-VIR_DATABASE_PROT_100 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.protein-sc100.zip',
-VIR_DATABASE_PROT_1000 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.protein-sc1000.zip',
-VIR_DATABASE_PROT_10 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.protein-sc10.zip',
-TAXDB = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.taxonomy.csv',
-
-# define ksizes
-DNA_K = [15,21]
-PROT_K = [7,10]
-SCALED = [10,100,1000]
-
-
-# include snakefiles
-include: "rules/bbmap.smk"
-include: "rules/virsorter2.smk"
-include: "rules/megahit.smk"
-include: "rules/sketch.smk"
-include: "rules/prodigal.smk"
-include: "rules/fmg.smk"
-#include: "rules/drep.smk"
+SCALED = [2,10,100]
+PROT_K = [7,10,12]
+VMR_DB = '/home/ntpierce/2023-spillover/output.vmr/vmr_MSL38_v1.protein.zip'
+VMR_TAX  = '/home/ntpierce/2023-spillover/output.vmr/vmr_MSL38_v1.taxonomy.csv'
+CLUSTER_TRESH = [0.95, 0.90, 0.85]
 
 wildcard_constraints:
     sample='\w+',
 
 rule all:
     input:
-        expand('../results/gather/{ident}.read.dna.s{scaled}.k{ksize}.fullgather.csv', ident=SAMPLES, ksize=DNA_K, scaled=SCALED),
-        expand('../results/gather/{ident}.read.translate.s{scaled}.k{ksize}.fullgather.csv', ident=SAMPLES, ksize=PROT_K, scaled=SCALED),
-        expand('../results/signatures/{ident}.vs.dna.s{scaled}.zip', ident=SAMPLES, scaled=SCALED),
-        #expand('../results/tax/{fullgather}.tax.csv', fullgather=FULLGATHER),
+        expand("../results/cluster/refseq.k{ksize}.s{scaled}.ani{ani_threshold}.csv",
+        ani_threshold=CLUSTER_TRESH, ksize=PROT_K, scaled=SCALED),
+        expand('../results/multifastgather/refseq.k{ksize}.s{scaled}.gather.txt', ksize=PROT_K, scaled=SCALED),
+
+# sketch first
+rule sketch:
+    input:
+        faa = '/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/results/240627_RefSeq.proteins.ns.faa'
+    output:
+        sig = "../results/signatures/refseq.k{ksize}.s2.sig.gz",
+    conda: 
+        "branchwater"
+    threads: 1
+    shell:
+        """ 
+        python ../workflow/scripts/custom-sketch.py \
+        {input.faa} --ksize {wildcards.ksize} --scaled 2 \
+        -o {output.sig}
+        """
+
+rule fastgather:
+# works
+
+    input:
+       fa='../results/signatures/240703_RefSeq.proteins.sig.gz',
+    output:
+        csv = "../results/fastgather/refseq.k{ksize}.s{scaled}.csv",
+    conda: 
+        "branchwater"
+    threads: 12
+    shell:
+        """ 
+        sourmash scripts fastgather \
+        {input.fa} {VMR_DB} \
+        -k {wildcards.ksize} --scaled {wildcards.scaled} \
+        -m protein -c {threads} -t 0 -o {output.csv}
+        """
+
+rule multifastgather:
+# works
+    input:
+       fa='/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/results/signatures/240703_RefSeq.proteins.zip',
+    output:
+        check = "/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/results/multifastgather/refseq.k{ksize}.s{scaled}.done",
+    params:
+        output_folder = '/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/results/multifastgather/refseq.k{ksize}.s{scaled}'
+    conda: 
+        "branchwater"
+    threads: 30
+    shell:
+        """ 
+        mkdir -p {params.output_folder}
+        cd {params.output_folder}
+        sourmash scripts fastmultigather \
+        {input.fa} {VMR_DB} \
+        -k {wildcards.ksize} --scaled {wildcards.scaled} \
+        -m protein -c {threads} -t 0 && touch {output.check}
+        """
+
+rule tax:
+# taxonomy for multifastgather output
+    input:
+       check="/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/results/multifastgather/refseq.k{ksize}.s{scaled}.done",
+    output:
+        list_gather_out = "../results/multifastgather/refseq.k{ksize}.s{scaled}.gather.txt",
+    params:
+        output_folder = '../results/tax/refseq.k{ksize}.s{scaled}'
+    conda: 
+        "branchwater"
+    threads: 1
+    shell:
+        """ 
+        mkdir -p {params.output_folder}
+        readlink -f /group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/results/multifastgather/refseq.k{wildcards.ksize}.s{wildcards.scaled}/*.gather.csv \
+        > {output.list_gather_out} && \
+        sourmash tax annotate --from-file {output.list_gather_out} \
+        -t {VMR_TAX} -o {params.output_folder} --ictv
+        """
+rule tax_concat:
+# taxonomy for multifastgather output
+    input:
+       check="../results/multifastgather/refseq.k{ksize}.s{scaled}.gather.txt",
+    output:
+        csv = "../results/tax/concat/refseq.k{ksize}.s{scaled}.csv",
+    conda: 
+        "csvtk"
+    threads: 1
+    shell:
+        """ 
+        csvtk concat ../results/tax/refseq.k{ksize}.s{scaled}/*.csv > ../{output.csv}
+        """
+
+rule pairwise:
+# taxonomy for multifastgather output
+    input:
+        sig = "../results/signatures/240703_RefSeq.proteins.zip",
+    output:
+        csv = "../results/pairwise/refseq.k{ksize}.s{scaled}.pw.csv",
+    conda: 
+        "branchwater"
+    threads: 30
+    shell:
+        """ 
+        sourmash scripts pairwise \
+        {input.sig} -k {wildcards.ksize} -s {wildcards.scaled} \
+        -m protein -c {threads} -a --write-all -o {output.csv}
+        """
+
+rule cluster_pw:
+    input:
+        csv = "../results/pairwise/refseq.k{ksize}.s{scaled}.pw.csv",
+    output:
+        clusters = "../results/cluster/refseq.k{ksize}.s{scaled}.ani{ani_threshold}.csv",
+        cluster_size = "../results/cluster/refseq.k{ksize}.s{scaled}.ani{ani_threshold}.counts.csv",
+    conda: 
+        "branchwater"
+    threads: 1
+    shell:
+        """ 
+        sourmash scripts cluster \
+        {input.csv} --threshold {wildcards.ani_threshold} \
+        --similarity-column average_containment_ani \
+        -o {output.clusters} --cluster-sizes {output.cluster_size}
+        """

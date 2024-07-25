@@ -36,9 +36,6 @@ rule do_gather_prot:
         --threshold-bp=0 > {output.txt_vs}
     """
 
-
-
-
 rule do_gather_read:
     input:
         sig_read='../results/signatures/{ident}.dna.s{scaled}_reads.zip',
@@ -52,7 +49,7 @@ rule do_gather_read:
         --threshold-bp=0 > {output.txt_read}      
     """
 
-rule do_gather_prot:
+rule do_gather_prot_read:
     input:
         sig_read='../results/signatures/{ident}.translate.s{scaled}_reads.zip',
         db = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.protein-sc{scaled}.zip'

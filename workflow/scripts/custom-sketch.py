@@ -17,8 +17,10 @@ def collect_records_in_batch(screed_iter):
     batch = []
     for record in screed_iter:
         name = record.name
-        record_prefix = name.split('_', 4)
-        record_prefix = '_'.join(record_prefix[:4])
+        record_prefix = name.split('_', 3)
+        #print(record_prefix)
+        record_prefix = '_'.join(record_prefix[:2])
+        #print(record_prefix)
 
         if prefix is None:
             prefix = record_prefix

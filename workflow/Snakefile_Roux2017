@@ -1,0 +1,41 @@
+# imports
+import os
+import pandas as pd
+
+# Define samples
+SAMPLES, = glob_wildcards('/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/resources/roux2017/sim_reads/{ident}_QC_R1.fastq.gz')
+FULLGATHER, = glob_wildcards('/group/ctbrowngrp2/scratch/annie/2023-sourmash-viruses/results/gather/{fullgather}.fullgather.csv')
+
+# define dbs
+VIR_DATABASE_DNA_100 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.dna-sc100.zip',
+VIR_DATABASE_DNA_1000 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.dna-sc1000.zip',
+VIR_DATABASE_DNA_10 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.dna-sc10.zip',
+VIR_DATABASE_PROT_100 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.protein-sc100.zip',
+VIR_DATABASE_PROT_1000 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.protein-sc1000.zip',
+VIR_DATABASE_PROT_10 = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.protein-sc10.zip',
+TAXDB = '/home/ntpierce/2023-vsmash/output.refseq69/refseq69_phages.taxonomy.csv',
+
+# define ksizes
+DNA_K = [15,21]
+PROT_K = [7,10]
+SCALED = [10,100,1000]
+
+
+# include snakefiles
+include: "rules/bbmap.smk"
+include: "rules/virsorter2.smk"
+include: "rules/megahit.smk"
+include: "rules/sketch.smk"
+include: "rules/prodigal.smk"
+include: "rules/fmg.smk"
+#include: "rules/drep.smk"
+
+wildcard_constraints:
+    sample='\w+',
+
+rule all:
+    input:
+        expand('../results/gather/{ident}.read.dna.s{scaled}.k{ksize}.fullgather.csv', ident=SAMPLES, ksize=DNA_K, scaled=SCALED),
+        expand('../results/gather/{ident}.read.translate.s{scaled}.k{ksize}.fullgather.csv', ident=SAMPLES, ksize=PROT_K, scaled=SCALED),
+        expand('../results/signatures/{ident}.vs.dna.s{scaled}.zip', ident=SAMPLES, scaled=SCALED),
+        #expand('../results/tax/{fullgather}.tax.csv', fullgather=FULLGATHER),
